@@ -1,6 +1,6 @@
 # Go OTP Authentication Service
 
-A production-ready OTP-based authentication service built with Go.
+A OTP-based authentication service built with Go.
 
 ## Features
 
