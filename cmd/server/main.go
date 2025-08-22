@@ -1,0 +1,137 @@
+package main
+
+import (
+	"time"
+
+	"go-auth/internal/config"
+	"go-auth/internal/database"
+	"go-auth/internal/handlers"
+	"go-auth/internal/middleware"
+	"go-auth/internal/repository"
+	"go-auth/internal/services"
+	"go-auth/pkg/utils"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+)
+
+var (
+	Version   = "dev"
+	BuildTime = ""
+	GitCommit = ""
+)
+
+// @title Go Auth API
+// @version 1.0
+// @description OTP-based authentication service
+// @host localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+func main() {
+	utils.InitLogger()
+
+	utils.Logger.WithFields(map[string]interface{}{
+		"version":    Version,
+		"build_time": BuildTime,
+		"git_commit": GitCommit,
+	}).Info("Starting Go Auth Service")
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		utils.Logger.WithError(err).Fatal("Failed to load config")
+	}
+
+	if err := database.ConnectDatabase(cfg); err != nil {
+		utils.Logger.WithError(err).Fatal("Failed to connect to database")
+	}
+
+	if err := database.RunMigrations(); err != nil {
+		utils.Logger.WithError(err).Fatal("Failed to run migrations")
+	}
+
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+
+	router.Use(middleware.RequestIDMiddleware())
+	router.Use(middleware.LoggingMiddleware())
+	router.Use(middleware.RecoveryWithLogging())
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "API-Version"},
+		ExposeHeaders:    []string{"API-Version", "X-Request-ID"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	router.Use(middleware.APIVersionMiddleware())
+	router.Use(middleware.DeprecationWarningMiddleware())
+
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":     "healthy",
+			"timestamp":  time.Now().Format(time.RFC3339),
+			"service":    "go-auth",
+			"version":    Version,
+			"build_time": BuildTime,
+		})
+	})
+
+	setupRoutes(router, cfg)
+
+	utils.Logger.WithFields(map[string]interface{}{
+		"port":    cfg.Port,
+		"version": Version,
+	}).Info("Server starting")
+
+	if err := router.Run(":" + cfg.Port); err != nil {
+		utils.Logger.WithError(err).Fatal("Failed to start server")
+	}
+}
+
+func setupRoutes(router *gin.Engine, cfg *config.Config) {
+	db := database.GetDB()
+
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(db)
+	otpRepo := repository.NewOTPRepository(db)
+	otpAttemptRepo := repository.NewOTPAttemptRepository(db)
+
+	// Initialize services with dependency injection
+	otpService := services.NewOTPService(cfg, otpRepo, otpAttemptRepo, userRepo)
+	userService := services.NewUserService(userRepo)
+
+	// Initialize handlers with dependency injection
+	authHandler := handlers.NewAuthHandler(otpService, cfg)
+	userHandler := handlers.NewUserHandler(userService)
+	versionHandler := handlers.NewVersionHandler(Version, BuildTime, GitCommit, gin.Mode())
+
+	router.GET("/version", versionHandler.GetVersion)
+	router.GET("/api/info", versionHandler.GetAPIInfo)
+
+	api := router.Group("/api/v1")
+
+	authGroup := api.Group("/auth")
+	{
+		authGroup.POST("/send-otp", authHandler.SendOTP)
+		authGroup.POST("/verify-otp", authHandler.VerifyOTP)
+
+		authProtected := authGroup.Group("")
+		authProtected.Use(middleware.AuthMiddleware(cfg))
+		authProtected.GET("/profile", authHandler.GetProfile)
+	}
+
+	userGroup := api.Group("/users")
+	userGroup.Use(middleware.AuthMiddleware(cfg))
+	{
+		userGroup.GET("", userHandler.GetUsers)
+		userGroup.GET("/stats", userHandler.GetUserStats)
+		userGroup.GET("/:id", userHandler.GetUser)
+	}
+
+	utils.Logger.Info("Routes configured successfully")
+}
