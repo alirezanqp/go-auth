@@ -12,6 +12,7 @@ A OTP-based authentication service built with Go.
 - Docker support
 - Comprehensive logging
 - API versioning
+- Swagger API Documentation
 - CI/CD pipeline with GitHub Actions
 
 ## Architecture
@@ -77,6 +78,18 @@ Environment variables:
 | `PORT` | Server port | `8080` |
 | `LOG_LEVEL` | Logging level | `info` |
 
+## API Documentation
+
+Interactive Swagger documentation is available at:
+```
+http://localhost:8080/swagger/index.html
+```
+
+Generate/update documentation:
+```bash
+make docs
+```
+
 ## API Endpoints
 
 ### Authentication
@@ -135,6 +148,7 @@ make lint        # Run linter
 make security    # Security scan
 make build       # Build application
 make docker-up   # Start with Docker
+make docs        # Generate Swagger documentation
 ```
 
 ## Database
