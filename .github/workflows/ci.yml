@@ -77,7 +77,7 @@ jobs:
           -o bin/server cmd/server/main.go
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: go-auth-binary
         path: bin/server
