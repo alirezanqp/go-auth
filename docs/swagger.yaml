@@ -1,0 +1,243 @@
+basePath: /api/v1
+definitions:
+  handlers.APIVersion:
+    properties:
+      build_time:
+        type: string
+      environment:
+        type: string
+      git_commit:
+        type: string
+      version:
+        type: string
+    type: object
+  models.SendOTPRequest:
+    properties:
+      phone_number:
+        type: string
+    required:
+    - phone_number
+    type: object
+  models.SendOTPResponse:
+    properties:
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      phone_number:
+        type: string
+      updated_at:
+        type: string
+    required:
+    - phone_number
+    type: object
+  models.UserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      phone_number:
+        type: string
+    type: object
+  models.UsersListResponse:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/models.UserResponse'
+        type: array
+    type: object
+  models.VerifyOTPRequest:
+    properties:
+      code:
+        type: string
+      phone_number:
+        type: string
+    required:
+    - code
+    - phone_number
+    type: object
+  models.VerifyOTPResponse:
+    properties:
+      message:
+        type: string
+      success:
+        type: boolean
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: OTP-based authentication service
+  title: Go Auth API
+  version: "1.0"
+paths:
+  /api/info:
+    get:
+      description: Returns API version, supported versions, deprecation notices, etc.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get comprehensive API information
+      tags:
+      - system
+  /auth/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - authentication
+  /auth/send-otp:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Phone number
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.SendOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SendOTPResponse'
+      summary: Send OTP
+      tags:
+      - authentication
+  /auth/verify-otp:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Phone number and OTP
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.VerifyOTPResponse'
+      summary: Verify OTP
+      tags:
+      - authentication
+  /users:
+    get:
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 10, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: Search by phone number
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UsersListResponse'
+      security:
+      - BearerAuth: []
+      summary: Get users list
+      tags:
+      - users
+  /users/{id}:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - users
+  /users/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user statistics
+      tags:
+      - users
+  /version:
+    get:
+      description: Returns the current API version, build time, and other metadata
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.APIVersion'
+      summary: Get API version information
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

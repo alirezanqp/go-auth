@@ -59,4 +59,4 @@ gosec-report.json
 # env file
 .env
 
-/docs
+/learn
